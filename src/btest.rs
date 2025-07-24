@@ -208,7 +208,7 @@ const BLUE:   *const c_char = c!("\x1b[94m");
 pub unsafe fn print_legend(row_width: usize) {
     for i in 0..REPORT_STATUS_ORDER.len() {
         let status = (*REPORT_STATUS_ORDER)[i];
-        println!("{1:0$}{2}{3}{4} - {5}", row_width + 2, "", r!(status.color()), r!(status.letter()), r!(RESET), r!(status.description()));
+        println!("{1:>0$}{2}{3}{4} - {5}", row_width + 2, "", r!(status.color()), r!(status.letter()), r!(RESET), r!(status.description()));
     }
 }
 
@@ -225,12 +225,12 @@ pub unsafe fn print_top_labels(targets: *const [Target], stats_by_target: *const
     for j in 0..targets.len() {
         let target = (*targets)[j];
         let stats = (*stats_by_target)[j];
-        print!("{1:0$}", row_width + 2, "");
+        print!("{1:>0$}", row_width + 2, "");
         for _ in 0..j {
             print!("│ ");
         }
         // TODO: these fancy unicode characters don't work well on mingw32 build via wine
-        print!("┌─{1:<0$}", col_width - 2*j, r!(target.name()));
+        print!("┌─{1:0$}", col_width - 2*j, r!(target.name()));
         print_report_stats(stats)
     }
 }
@@ -240,11 +240,11 @@ pub unsafe fn print_bottom_labels(targets: *const [Target], stats_by_target: *co
     for j in (0..targets.len()).rev() {
         let target = (*targets)[j];
         let stats = (*stats_by_target)[j];
-        print!("{1:0$}", row_width + 2, "");
+        print!("{1:>0$}", row_width + 2, "");
         for _ in 0..j {
             print!("│ ");
         }
-        print!("└─{1:<0$}", col_width - 2*j, r!(target.name()));
+        print!("└─{1:0$}", col_width - 2*j, r!(target.name()));
         print_report_stats(stats)
     }
 }
@@ -387,7 +387,7 @@ pub unsafe fn generate_report(reports: *const [Report], stats_by_target: *const 
     print_top_labels(targets, stats_by_target, row_width, col_width);
     for i in 0..reports.len() {
         let report = (*reports)[i];
-        print!("{1:0$}:", row_width, r!(report.name));
+        print!("{1:>0$}:", row_width, r!(report.name));
         for j in 0..report.statuses.count {
             let status = *report.statuses.items.add(j);
             print!(" {}{}{}", r!(status.color()), r!(status.letter()), r!(RESET));
@@ -612,10 +612,10 @@ pub unsafe fn replay_tests(
                                     eprintln!("UNEXPECTED OUTCOME!!!");
                                     jim_begin(jim);
                                     jim_string(jim, (*row).expected_stdout);
-                                    eprintln!("EXPECTED: {1:0$}", (*jim).sink_count, r!((*jim).sink));
+                                    eprintln!("EXPECTED: {1:>0$}", (*jim).sink_count, r!((*jim).sink));
                                     jim_begin(jim);
                                     jim_string(jim, stdout);
-                                    eprintln!("ACTUAL:   {1:0$}", (*jim).sink_count, r!((*jim).sink));
+                                    eprintln!("ACTUAL:   {1:>0$}", (*jim).sink_count, r!((*jim).sink));
                                     da_append(&mut report.statuses, ReportStatus::StdoutMismatch);
                                 } else {
                                     da_append(&mut report.statuses, ReportStatus::OK);
@@ -733,22 +733,22 @@ pub unsafe fn main(argc: i32, argv: *mut*mut c_char) -> Option<()> {
             let action = (*ACTION_ORDER)[i];
             match action {
                 Action::Replay => {
-                    println!("  {1:<0$} - Replay the selected Test Matrix slice with expected outputs from {2}.", width, r!(action.name()), r!(json_path));
+                    println!("  {1:0$} - Replay the selected Test Matrix slice with expected outputs from {2}.", width, r!(action.name()), r!(json_path));
                 }
                 Action::Record => {
-                    println!("  {1:<0$} - Record the selected Test Matrix slice into {2}.", width, r!(action.name()), r!(json_path));
+                    println!("  {1:0$} - Record the selected Test Matrix slice into {2}.", width, r!(action.name()), r!(json_path));
                 }
                 Action::Prune  => {
-                    println!("  {1:<0$} - Prune all the recordings from {2} that are outside of the selected Test Matrix slice.", width, r!(action.name()), r!(json_path));
-                    println!("  {1:<0$}   Useful when you delete targets or test cases. Just delete a target or a test case and", width, "");
-                    println!("  {1:<0$}   run `{2} -{3} {4}` without any additional flags.", width, "", r!(flag_program_name()), r!(flag_name(action_flag)), r!(Action::Prune.name()));
+                    println!("  {1:0$} - Prune all the recordings from {2} that are outside of the selected Test Matrix slice.", width, r!(action.name()), r!(json_path));
+                    println!("  {1:0$}   Useful when you delete targets or test cases. Just delete a target or a test case and", width, "");
+                    println!("  {1:0$}   run `{2} -{3} {4}` without any additional flags.", width, "", r!(flag_program_name()), r!(flag_name(action_flag)), r!(Action::Prune.name()));
                 }
                 Action::Disable => {
-                    println!("  {1:<0$} - Disable all the tests in the selected Test Matrix slice.", width, r!(action.name()));
-                    println!("  {1:<0$}   You can optionally set the comment with the -{2} flag.", width, "", r!(flag_name(comment)));
+                    println!("  {1:0$} - Disable all the tests in the selected Test Matrix slice.", width, r!(action.name()));
+                    println!("  {1:0$}   You can optionally set the comment with the -{2} flag.", width, "", r!(flag_name(comment)));
                 }
                 Action::Count => {
-                    println!("  {1:<0$} - Count the amount of rows in {2}.", width, r!(action.name()), r!(json_path));
+                    println!("  {1:0$} - Count the amount of rows in {2}.", width, r!(action.name()), r!(json_path));
                 }
             };
         }
@@ -917,7 +917,7 @@ pub unsafe fn main(argc: i32, argv: *mut*mut c_char) -> Option<()> {
                 let case_name = *cases.items.add(i);
                 for j in 0..targets.count {
                     let target = *targets.items.add(j);
-                    println!("INFO: disabling {1:<0$} for {3:<2$}", case_width, r!(case_name), target_width, r!(target.name()));
+                    println!("INFO: disabling {1:0$} for {3:2$}", case_width, r!(case_name), target_width, r!(target.name()));
                     if let Some(row) = test_table_find_row(&mut tt, case_name, target) {
                         (*row).state = TestState::Disabled;
                         if !(*comment).is_null() {
