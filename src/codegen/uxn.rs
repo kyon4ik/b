@@ -106,7 +106,7 @@ const FIRST_ARG: u8 = 4;
 pub unsafe fn generate_asm_funcs(_output: *mut String_Builder, asm_funcs: *const [AsmFunc]) {
     for i in 0..asm_funcs.len() {
         let asm_func = (*asm_funcs)[i];
-        missingf!(asm_func.name_loc, c!("__asm__ functions for uxn"));
+        missingf!(asm_func.name_loc, "__asm__ functions for uxn");
     }
 }
 
@@ -182,7 +182,7 @@ pub unsafe fn generate_function(name: *const c_char, name_loc: Loc, params_count
     const MAX_ARGS: usize = (256 - FIRST_ARG as usize) / 2;
 
     if params_count > MAX_ARGS {
-        missingf!(name_loc, c!("Too many parameters in function definition. We support only %zu but %zu were provided\n"), MAX_ARGS, params_count);
+        missingf!(name_loc, "Too many parameters in function definition. We support only {} but {} were provided\n", MAX_ARGS, params_count);
     }
 
     // put BP on stack
@@ -483,7 +483,7 @@ pub unsafe fn generate_function(name: *const c_char, name_loc: Loc, params_count
             }
             Op::Funcall {result, fun, args} => {
                 if args.count > MAX_ARGS.into() {
-                    missingf!(op.loc, c!("Too many function call arguments. We support only %d but %zu were provided\n"), MAX_ARGS, args.count);
+                    missingf!(op.loc, "Too many function call arguments. We support only {} but {} were provided\n", MAX_ARGS, args.count);
                 }
                 for i in 0..args.count {
                     load_arg(*args.items.add(i), op.loc, output, assembler);
@@ -494,7 +494,7 @@ pub unsafe fn generate_function(name: *const c_char, name_loc: Loc, params_count
                 write_lit_ldz2(output, FIRST_ARG);
                 store_auto(output, result);
             }
-            Op::Asm {..} => missingf!(op.loc, c!("Inline assembly\n")),
+            Op::Asm {..} => missingf!(op.loc, "Inline assembly\n"),
             Op::Label {label} => {
                 link_label(assembler, *labels.items.add(label), (*output).count);
             }

@@ -1405,32 +1405,33 @@ pub unsafe fn main(mut argc: i32, mut argv: *mut*mut c_char) -> Option<()> {
             }
         }
         Target::Uxn => {
-            // codegen::uxn::generate_program(
-            //     // Inputs
-            //     &c.program, program_path, garbage_base, da_slice(*linker), *debug,
-            //     // Temporaries
-            //     &mut output, &mut cmd,
-            // )?;
+            codegen::uxn::generate_program(
+                // Inputs
+                &c.program, program_path, garbage_base, da_slice(*linker), *debug,
+                // Temporaries
+                &mut output, &mut cmd,
+            )?;
 
-            // if *run {
-            //     codegen::uxn::run_program(&mut cmd, c!("uxnemu"), program_path, da_slice(run_args), None)?;
-            // }
+            if *run {
+                codegen::uxn::run_program(&mut cmd, c!("uxnemu"), program_path, da_slice(run_args), None)?;
+            }
         }
         Target::Mos6502 => {
-            // let config = codegen::mos6502::parse_config_from_link_flags(da_slice(*linker))?;
+            let config = codegen::mos6502::parse_config_from_link_flags(da_slice(*linker))?;
 
-            // codegen::mos6502::generate_program(
-            //     // Inputs
-            //     &c.program, program_path, garbage_base, config, *debug,
-            //     // Temporaries
-            //     &mut output, &mut cmd,
-            // )?;
+            codegen::mos6502::generate_program(
+                // Inputs
+                &c.program, program_path, garbage_base, config, *debug,
+                // Temporaries
+                &mut output, &mut cmd,
+            )?;
 
-            // if *run {
-            //     codegen::mos6502::run_program(&mut output, config, program_path, None)?;
-            // }
+            if *run {
+                codegen::mos6502::run_program(&mut output, config, program_path, None)?;
+            }
         }
         Target::ILasm_Mono => {
+            // FIXME: use new formating
             // codegen::ilasm_mono::generate_program(
             //     // Inputs
             //     &c.program, program_path, garbage_base, da_slice(*linker), *debug,

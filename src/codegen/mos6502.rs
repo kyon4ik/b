@@ -13,6 +13,7 @@ use crate::ir::*;
 use crate::nob::*;
 use crate::diagf;
 use crate::crust::libc::*;
+use crate::crust::IoWrite;
 
 // TODO: does this have to be a macro?
 macro_rules! instr_enum {
@@ -363,7 +364,7 @@ pub unsafe fn load_arg(arg: Arg, loc: Loc, out: *mut String_Builder, asm: *mut A
         Arg::RefAutoVar(index) => load_auto_var_ref(out, index, asm),
         Arg::Literal(value) => {
             if value >= 65536 {
-                diagf!(loc, c!("WARNING: contant $%llX out of range for 16 bits\n"), value);
+                diagf!(loc, "WARNING: contant ${:X} out of range for 16 bits\n", value);
             }
             instr8(out, LDA, IMM, value as u8);
             instr8(out, LDY, IMM, (value >> 8) as u8);
@@ -458,14 +459,13 @@ pub unsafe fn parse_num(line_begin: *const c_char, mut line: *const c_char, mut 
         },
         c => {
             loc.line_offset += (line as isize - line_begin as isize + 1) as i32;
-            diagf!(loc, c!("ERROR: unexpected character `%c` in numberic literal\n"),
-                   c as c_int);
+            diagf!(loc, "ERROR: unexpected character `{}` in numberic literal\n", c as char);
             abort();
         }
     };
     if v > 0xFFFF {
         loc.line_offset += (line as isize - line_begin as isize + 1) as i32;
-        diagf!(loc, c!("ERROR: contant $%X out of range for 16 bits\n"), v);
+        diagf!(loc, "ERROR: contant ${:X} out of range for 16 bits\n", v);
         abort();
     }
     while isspace(*end as i32) != 0 {end = end.add(1);}
@@ -496,7 +496,7 @@ pub unsafe fn assemble_statement(out: *mut String_Builder,
         Some(v) => v,
         None => {
             loc.line_offset += (line as isize - line_begin as isize + 1) as i32;
-            diagf!(loc, c!("ERROR: invalid instruction mnemonic `%s`\n"), buf.as_ptr());
+            diagf!(loc, "ERROR: invalid instruction mnemonic `{}`\n", r!(&buf));
             abort();
         }
     };
@@ -515,8 +515,7 @@ pub unsafe fn assemble_statement(out: *mut String_Builder,
             (num, line) = parse_num(line_begin, line, loc);
             if num > 0xFF {
                 loc.line_offset += (line as isize - line_begin as isize + 1) as i32;
-                diagf!(loc, c!("ERROR: constant $%X out of range for 8 bit immediate\n"),
-                       num as c_uint);
+                diagf!(loc, "ERROR: constant ${:X} out of range for 8 bit immediate\n", num);
                 abort();
             }
             arg8 = Some(num as u8);
@@ -552,8 +551,7 @@ pub unsafe fn assemble_statement(out: *mut String_Builder,
             if *line as u8 == b',' {
                 if num > 0xFF {
                     loc.line_offset += (line as isize - line_begin as isize + 1) as i32;
-                    diagf!(loc, c!("ERROR: constant $%X out of 8-bit range for indirect X\n"),
-                           num as c_uint);
+                    diagf!(loc, "ERROR: constant ${:X} out of 8-bit range for indirect X\n", num);
                     abort();
                 }
                 arg8 = Some(num as u8);
@@ -562,14 +560,14 @@ pub unsafe fn assemble_statement(out: *mut String_Builder,
                 while isspace(*line as i32) != 0 {line = line.add(1);}
                 if toupper(*line as i32) as u8 != b'X' {
                     loc.line_offset += (line as isize - line_begin as isize + 1) as i32;
-                    diagf!(loc, c!("ERROR: X expected for indirect addressing mode\n"), *line as c_int);
+                    diagf!(loc, "ERROR: X expected for indirect addressing mode\n");
                     abort();
                 }
                 line = line.add(1);
                 while isspace(*line as i32) != 0 {line = line.add(1);}
                 if toupper(*line as i32) as u8 != b')' {
                     loc.line_offset += (line as isize - line_begin as isize + 1) as i32;
-                    diagf!(loc, c!("ERROR: ) expected after X-indirect address\n"), *line as c_int);
+                    diagf!(loc, "ERROR: ) expected after X-indirect address\n");
                     abort();
                 }
                 line = line.add(1);
@@ -577,7 +575,7 @@ pub unsafe fn assemble_statement(out: *mut String_Builder,
             } else {
                 if *line as u8 != b')' {
                     loc.line_offset += (line as isize - line_begin as isize + 1) as i32;
-                    diagf!(loc, c!("ERROR: expected ',' or ')' after indirect address\n"), *line as c_int);
+                    diagf!(loc, "ERROR: expected ',' or ')' after indirect address\n");
                     abort();
                 }
                 line = line.add(1);
@@ -586,8 +584,7 @@ pub unsafe fn assemble_statement(out: *mut String_Builder,
                 if *line as u8 == b',' {
                     if num > 0xFF {
                         loc.line_offset += (line as isize - line_begin as isize + 1) as i32;
-                        diagf!(loc, c!("ERROR: constant $%X out of 8-bit range for indirect Y\n"),
-                               num as c_uint);
+                        diagf!(loc, "ERROR: constant ${:X} out of 8-bit range for indirect Y\n", num);
                         abort();
                     }
                     arg8 = Some(num as u8);
@@ -596,7 +593,7 @@ pub unsafe fn assemble_statement(out: *mut String_Builder,
                     while isspace(*line as i32) != 0 {line = line.add(1);}
                     if toupper(*line as i32) as u8 != b'Y' {
                         loc.line_offset += (line as isize - line_begin as isize + 1) as i32;
-                        diagf!(loc, c!("ERROR: Y expected for Y-indirect addressing mode\n"), *line as c_int);
+                        diagf!(loc, "ERROR: Y expected for Y-indirect addressing mode\n");
                         abort();
                     }
                     line = line.add(1);
@@ -609,7 +606,7 @@ pub unsafe fn assemble_statement(out: *mut String_Builder,
         },
         c => {
             loc.line_offset += (line as isize - line_begin as isize + 1) as i32;
-            diagf!(loc, c!("ERROR: unexpected character `%c`\n"), c as c_int);
+            diagf!(loc, "ERROR: unexpected character `{}`\n", c as char);
             abort();
         }
     };
@@ -634,8 +631,8 @@ pub unsafe fn assemble_statement(out: *mut String_Builder,
     let opcode = OPCODES[instr as usize][mode as usize];
     if opcode == INVL {
         loc.line_offset += (line as isize - line_begin as isize + 1) as i32;
-        diagf!(loc, c!("ERROR: invalid combination of instruction `%s` and operand `%s`\n"),
-               buf.as_ptr(), operand);
+        diagf!(loc, "ERROR: invalid combination of instruction `{}` and operand `{}`\n",
+               r!(&buf), r!(operand));
         abort();
     }
 
@@ -648,7 +645,7 @@ pub unsafe fn assemble_statement(out: *mut String_Builder,
 
     if *line != 0 {
         loc.line_offset += (line as isize - line_begin as isize + 1) as i32;
-        diagf!(loc, c!("ERROR: trailing garbage: `%s`\n"), line);
+        diagf!(loc, "ERROR: trailing garbage: `{}`\n", r!(line));
         abort();
     }
 }
@@ -1187,7 +1184,7 @@ pub unsafe fn generate_function(name: *const c_char, params_count: usize, auto_v
                     },
                     Arg::Literal(lit) => {
                         if lit >= 65536 {
-                            diagf!(op.loc, c!("ERROR: function address $%X out of range for 16 bits\n"), lit);
+                            diagf!(op.loc, "ERROR: function address ${:X} out of range for 16 bits\n", lit);
                             abort();
                         }
                         instr16(out, JSR, ABS, lit as u16);
@@ -1552,7 +1549,7 @@ pub unsafe fn run_impl(output: *mut String_Builder, config: Config, stdout: *mut
         }
 
         if fake6502::pc == 0xFFEF { // Emulating wozmon ECHO routine
-            fprintf(stdout, c!("%c"), fake6502::a as c_uint);
+            write!(&mut (*stdout), "{}", fake6502::a as char);
             fake6502::rts();
         }
     }
