@@ -22,7 +22,7 @@ pub unsafe fn call_arg(arg: Arg, loc: Loc, output: *mut String_Builder, os: Os) 
         Arg::RefExternal(name) | Arg::External(name) => match os {
             Os::Linux   => sb_appendf(output, c!("    bl %s\n"), name),
             Os::Darwin  => sb_appendf(output, c!("    bl _%s\n"), name),
-            Os::Windows => missingf!(loc, c!("AArch64 is not supported on windows\n")),
+            Os::Windows => missingf!(loc, "AArch64 is not supported on windows\n"),
         }
         arg => {
             load_arg_to_reg(arg, c!("x16"), output, loc, os);
@@ -73,7 +73,7 @@ pub unsafe fn load_arg_to_reg(arg: Arg, reg: *const c_char, output: *mut String_
                     sb_appendf(output, c!("    adrp %s, _%s@GOTPAGE\n"), reg, name);
                     sb_appendf(output, c!("    ldr  %s, [%s, _%s@GOTPAGEOFF]\n"), reg, reg, name);
                 }
-                Os::Windows => missingf!(loc, c!("AArch64 is not supported on windows\n")),
+                Os::Windows => missingf!(loc, "AArch64 is not supported on windows\n"),
             }
             sb_appendf(output, c!("    ldr %s, [%s]\n"), reg, reg);
         }
@@ -93,7 +93,7 @@ pub unsafe fn load_arg_to_reg(arg: Arg, reg: *const c_char, output: *mut String_
                 sb_appendf(output, c!("    adrp %s, _%s@GOTPAGE\n"), reg, name);
                 sb_appendf(output, c!("    ldr  %s, [%s, _%s@GOTPAGEOFF]\n"), reg, reg, name);
             }
-            Os::Windows => missingf!(loc, c!("AArch64 is not supported on windows\n")),
+            Os::Windows => missingf!(loc, "AArch64 is not supported on windows\n"),
         },
         Arg::AutoVar(index) => {
             sb_appendf(output, c!("    ldr %s, [x29, -%zu]\n"), reg, index*8);
@@ -111,11 +111,11 @@ pub unsafe fn load_arg_to_reg(arg: Arg, reg: *const c_char, output: *mut String_
                     sb_appendf(output, c!("    adrp %s, .dat@PAGE\n"), reg);
                     sb_appendf(output, c!("    add  %s, %s, .dat@PAGEOFF\n"), reg, reg);
                 }
-                Os::Windows => missingf!(loc, c!("AArch64 is not supported on windows\n")),
+                Os::Windows => missingf!(loc, "AArch64 is not supported on windows\n"),
             }
 
             if offset >= 4095 {
-                missingf!(loc, c!("Data offsets bigger than 4095 are not supported yet\n"));
+                missingf!(loc, "Data offsets bigger than 4095 are not supported yet\n");
             } else if offset > 0 {
                 sb_appendf(output, c!("    add %s, %s, %zu\n"), reg, reg, offset);
             }
@@ -296,7 +296,7 @@ pub unsafe fn generate_function(name: *const c_char, _name_loc: Loc, params_coun
                         sb_appendf(output, c!("    adrp x1, _%s@GOTPAGE\n"), name);
                         sb_appendf(output, c!("    ldr  x1, [x1, _%s@GOTPAGEOFF]\n"), name);
                     }
-                    Os::Windows => missingf!(op.loc, c!("AArch64 is not supported on windows\n")),
+                    Os::Windows => missingf!(op.loc, "AArch64 is not supported on windows\n"),
                 }
                 sb_appendf(output, c!("    str x0, [x1]\n"), name);
             }
@@ -359,14 +359,14 @@ pub unsafe fn generate_function(name: *const c_char, _name_loc: Loc, params_coun
                 match os {
                     Os::Linux => sb_appendf(output, c!(".L%s.label_%zu:\n"), name, label),
                     Os::Darwin => sb_appendf(output, c!("L%s.label_%zu:\n"), name, label),
-                    Os::Windows => missingf!(op.loc, c!("AArch64 is not supported on windows\n")),
+                    Os::Windows => missingf!(op.loc, "AArch64 is not supported on windows\n"),
                 };
             }
             Op::JmpLabel {label} => {
                 match os {
                     Os::Linux => sb_appendf(output, c!("b .L%s.label_%zu\n"), name, label),
                     Os::Darwin => sb_appendf(output, c!("b L%s.label_%zu\n"), name, label),
-                    Os::Windows => missingf!(op.loc, c!("AArch64 is not supported on windows\n")),
+                    Os::Windows => missingf!(op.loc, "AArch64 is not supported on windows\n"),
                 };
             }
             Op::JmpIfNotLabel {label, arg} => {
@@ -375,7 +375,7 @@ pub unsafe fn generate_function(name: *const c_char, _name_loc: Loc, params_coun
                 match os {
                     Os::Linux => sb_appendf(output, c!("    beq .L%s.label_%zu\n"), name, label),
                     Os::Darwin => sb_appendf(output, c!("    beq L%s.label_%zu\n"), name, label),
-                    Os::Windows => missingf!(op.loc, c!("AArch64 is not supported on windows\n")),
+                    Os::Windows => missingf!(op.loc, "AArch64 is not supported on windows\n"),
                 };
             }
             Op::Index {result, arg, offset} => {
@@ -480,7 +480,7 @@ pub unsafe fn generate_asm_funcs(output: *mut String_Builder, asm_funcs: *const 
                 sb_appendf(output, c!(".p2align 4\n"));
                 sb_appendf(output, c!("_%s:\n"), asm_func.name);
             }
-            Os::Windows => missingf!(asm_func.name_loc, c!("AArch64 is not supported on windows\n")),
+            Os::Windows => missingf!(asm_func.name_loc, "AArch64 is not supported on windows\n"),
         }
         for j in 0..asm_func.body.count {
             let stmt = *asm_func.body.items.add(j);

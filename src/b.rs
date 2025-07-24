@@ -70,7 +70,7 @@ pub unsafe fn expect_tokens(l: *mut Lexer, tokens: *const [Token]) -> Option<()>
     }
     da_append(&mut sb, 0);
 
-    diagf!((*l).loc, c!("ERROR: expected %s, but got %s\n"), sb.items, lexer::display_token((*l).token));
+    diagf!((*l).loc, "ERROR: expected {}, but got {}\n", r!(sb.items), r!(lexer::display_token((*l).token)));
 
     free(sb.items);
     None
@@ -104,7 +104,7 @@ pub unsafe fn get_and_expect_tokens(l: *mut Lexer, clexes: *const [Token]) -> Op
 pub unsafe fn expect_token_id(l: *mut Lexer, id: *const c_char) -> Option<()> {
     expect_token(l, Token::ID)?;
     if strcmp((*l).string, id) != 0 {
-        diagf!((*l).loc, c!("ERROR: expected `%s`, but got `%s`\n"), id, (*l).string);
+        diagf!((*l).loc, "ERROR: expected `{}`, but got `{}`\n", r!(id), r!((*l).string));
         return None;
     }
     Some(())
@@ -170,8 +170,8 @@ pub unsafe fn declare_var(c: *mut Compiler, name: *const c_char, loc: Loc, stora
     let scope = da_last_mut(&mut (*c).vars).expect("There should be always at least the global scope");
     let existing_var = find_var_near(scope, name);
     if !existing_var.is_null() {
-        diagf!(loc, c!("ERROR: redefinition of variable `%s`\n"), name);
-        diagf!((*existing_var).loc, c!("NOTE: the first declaration is located here\n"));
+        diagf!(loc, "ERROR: redefinition of variable `{}`\n", r!(name));
+        diagf!((*existing_var).loc, "NOTE: the first declaration is located here\n");
         return bump_error_count(c);
     }
 
@@ -206,8 +206,8 @@ pub unsafe fn find_goto_label(labels: *const Array<GotoLabel>, name: *const c_ch
 pub unsafe fn define_goto_label(c: *mut Compiler, name: *const c_char, loc: Loc, label: usize) -> Option<()> {
     let existing_label = find_goto_label(&(*c).func_goto_labels, name);
     if !existing_label.is_null() {
-        diagf!(loc, c!("ERROR: duplicate label `%s`\n"), name);
-        diagf!((*existing_label).loc, c!("NOTE: the first definition is located here\n"));
+        diagf!(loc, "ERROR: duplicate label `{}`\n", r!(name));
+        diagf!((*existing_label).loc, "NOTE: the first definition is located here\n");
         return bump_error_count(c);
     }
 
@@ -357,7 +357,7 @@ pub unsafe fn compile_primary_expression(l: *mut Lexer, c: *mut Compiler) -> Opt
             let (arg, is_lvalue) = compile_primary_expression(l, c)?;
 
             if !is_lvalue {
-                diagf!(loc, c!("ERROR: cannot take the address of an rvalue\n"));
+                diagf!(loc, "ERROR: cannot take the address of an rvalue\n");
                 return bump_error_count(c).map(|()| (Arg::Bogus, false));
             }
 
@@ -374,7 +374,7 @@ pub unsafe fn compile_primary_expression(l: *mut Lexer, c: *mut Compiler) -> Opt
             let (arg, is_lvalue) = compile_primary_expression(l, c)?;
 
             if !is_lvalue {
-                diagf!(loc, c!("ERROR: cannot increment an rvalue\n"));
+                diagf!(loc, "ERROR: cannot increment an rvalue\n");
                 return bump_error_count(c).map(|()| (Arg::Bogus, false));
             }
 
@@ -386,7 +386,7 @@ pub unsafe fn compile_primary_expression(l: *mut Lexer, c: *mut Compiler) -> Opt
             let (arg, is_lvalue) = compile_primary_expression(l, c)?;
 
             if !is_lvalue {
-                diagf!(loc, c!("ERROR: cannot decrement an rvalue\n"));
+                diagf!(loc, "ERROR: cannot decrement an rvalue\n");
                 return bump_error_count(c).map(|()| (Arg::Bogus, false));
             }
 
@@ -413,7 +413,7 @@ pub unsafe fn compile_primary_expression(l: *mut Lexer, c: *mut Compiler) -> Opt
             Some((Arg::DataOffset(offset), false))
         }
         _ => {
-            diagf!((*l).loc, c!("Expected start of a primary expression but got %s\n"), lexer::display_token((*l).token));
+            diagf!((*l).loc, "Expected start of a primary expression but got {}\n", r!(lexer::display_token((*l).token)));
             None
         }
     };
@@ -438,7 +438,7 @@ pub unsafe fn compile_primary_expression(l: *mut Lexer, c: *mut Compiler) -> Opt
             Token::PlusPlus => {
                 let loc = (*l).loc;
                 if !is_lvalue {
-                    diagf!(loc, c!("ERROR: cannot increment an rvalue\n"));
+                    diagf!(loc, "ERROR: cannot increment an rvalue\n");
                     return bump_error_count(c).map(|()| (Arg::Bogus, false));
                 }
 
@@ -451,7 +451,7 @@ pub unsafe fn compile_primary_expression(l: *mut Lexer, c: *mut Compiler) -> Opt
             Token::MinusMinus => {
                 let loc = (*l).loc;
                 if !is_lvalue {
-                    diagf!(loc, c!("ERROR: cannot decrement an rvalue\n"));
+                    diagf!(loc, "ERROR: cannot decrement an rvalue\n");
                     return bump_error_count(c).map(|()| (Arg::Bogus, false));
                 }
 
@@ -536,7 +536,7 @@ pub unsafe fn compile_assign_expression(l: *mut Lexer, c: *mut Compiler) -> Opti
         let (rhs, _) = compile_assign_expression(l, c)?;
 
         if !lvalue {
-            diagf!(binop_loc, c!("ERROR: cannot assign to rvalue\n"));
+            diagf!(binop_loc, "ERROR: cannot assign to rvalue\n");
             return bump_error_count(c).map(|()| (Arg::Bogus, false));
         }
 
@@ -702,7 +702,7 @@ pub unsafe fn compile_statement(l: *mut Lexer, c: *mut Compiler) -> Option<()> {
                 if (*l).token == Token::IntLit || (*l).token == Token::CharLit {
                     let size = (*l).int_number as usize;
                     if size == 0 {
-                        missingf!((*l).loc, c!("It's unclear how to compile automatic vector of size 0\n"));
+                        missingf!((*l).loc, "It's unclear how to compile automatic vector of size 0\n");
                     }
                     for _ in 0..size {
                         allocate_auto_var(&mut (*c).auto_vars_ator);
@@ -826,7 +826,7 @@ pub unsafe fn compile_statement(l: *mut Lexer, c: *mut Compiler) -> Option<()> {
 
                 Some(())
             } else {
-                diagf!(case_loc, c!("ERROR: case label outside of switch\n"));
+                diagf!(case_loc, "ERROR: case label outside of switch\n");
                 bump_error_count(c)
             }
         }
@@ -873,9 +873,9 @@ pub unsafe fn compile_statement(l: *mut Lexer, c: *mut Compiler) -> Option<()> {
 }
 
 pub unsafe fn usage() {
-    fprintf(stderr(), c!("B compiler\n"));
-    fprintf(stderr(), c!("Usage: %s [OPTIONS] <inputs...> [--] [run arguments]\n"), flag_program_name());
-    fprintf(stderr(), c!("OPTIONS:\n"));
+    eprintln!("B compiler");
+    eprintln!("Usage: {} [OPTIONS] <inputs...> [--] [run arguments]", r!(flag_program_name()));
+    eprintln!("OPTIONS:");
     flag_print_options(stderr());
 }
 
@@ -926,7 +926,7 @@ pub const MAX_ERROR_COUNT: usize = 100;
 pub unsafe fn bump_error_count(c: *mut Compiler) -> Option<()> {
     (*c).error_count += 1;
     if (*c).error_count >= MAX_ERROR_COUNT {
-        fprintf(stderr(), c!("TOO MANY ERRORS! Fix your program!\n"));
+        eprint!("TOO MANY ERRORS! Fix your program!\n");
         return None
     }
     Some(())
@@ -944,14 +944,14 @@ pub unsafe fn compile_program(l: *mut Lexer, c: *mut Compiler) -> Option<()> {
                 let func_loc = (*l).loc;
                 if let Some(existing_variadic) = assoc_lookup_cstr(da_slice((*c).program.variadics), func) {
                     // TODO: report all the duplicate variadics maybe?
-                    diagf!(func_loc, c!("ERROR: duplicate variadic declaration `%s`\n"), func);
-                    diagf!((*existing_variadic).loc, c!("NOTE: the first declaration is located here\n"));
+                    diagf!(func_loc, "ERROR: duplicate variadic declaration `{}`\n", r!(func));
+                    diagf!((*existing_variadic).loc, "NOTE: the first declaration is located here\n");
                     bump_error_count(c)?;
                 }
                 get_and_expect_token_but_continue(l, c, Token::Comma)?;
                 get_and_expect_token_but_continue(l, c, Token::IntLit)?;
                 if (*l).int_number == 0 {
-                    diagf!((*l).loc, c!("ERROR: variadic function `%s` cannot have 0 arguments\n"), func);
+                    diagf!((*l).loc, "ERROR: variadic function `{}` cannot have 0 arguments\n", r!(func));
                     bump_error_count(c)?;
                 }
                 da_append(&mut (*c).program.variadics, (func, Variadic {
@@ -1009,7 +1009,7 @@ pub unsafe fn compile_program(l: *mut Lexer, c: *mut Compiler) -> Option<()> {
                             let used_label = *(*c).func_gotos.items.add(i);
                             let existing_label = find_goto_label(&(*c).func_goto_labels, used_label.name);
                             if existing_label.is_null() {
-                                diagf!(used_label.loc, c!("ERROR: label `%s` used but not defined\n"), used_label.name);
+                                diagf!(used_label.loc, "ERROR: label `{}` used but not defined\n", r!(used_label.name));
                                 bump_error_count(c)?;
                                 continue;
                             }
@@ -1071,7 +1071,7 @@ pub unsafe fn compile_program(l: *mut Lexer, c: *mut Compiler) -> Option<()> {
                                     let scope = da_last_mut(&mut (*c).vars).expect("There should be always at least the global scope");
                                     let var = find_var_near(scope, name);
                                     if var.is_null() {
-                                        diagf!((*l).loc, c!("ERROR: could not find name `%s`\n"), name);
+                                        diagf!((*l).loc, "ERROR: could not find name `{}`\n", r!(name));
                                         bump_error_count(c)?;
                                     }
                                     ImmediateValue::Name(name)
@@ -1228,9 +1228,9 @@ pub unsafe fn main(mut argc: i32, mut argv: *mut*mut c_char) -> Option<()> {
     }
 
     if strcmp(*target_name, c!("list")) == 0 {
-        fprintf(stderr(), c!("Compilation targets:\n"));
+        eprint!("Compilation targets:\n");
         for i in 0..TARGET_ORDER.len() {
-            fprintf(stderr(), c!("    %s\n"), (*TARGET_ORDER)[i].name());
+            eprint!("    {}\n", r!((*TARGET_ORDER)[i].name()));
         }
         return Some(());
     }
@@ -1298,7 +1298,7 @@ pub unsafe fn main(mut argc: i32, mut argv: *mut*mut c_char) -> Option<()> {
         let used_global = *c.used_funcs.items.add(i);
 
         if find_var_deep(&mut c.vars, used_global.name).is_null() {
-            diagf!(used_global.loc, c!("ERROR: could not find name `%s`\n"), used_global.name);
+            diagf!(used_global.loc, "ERROR: could not find name `{}`\n", r!(used_global.name));
             bump_error_count(&mut c);
         }
     }
@@ -1315,7 +1315,7 @@ pub unsafe fn main(mut argc: i32, mut argv: *mut*mut c_char) -> Option<()> {
     if *ir {
         dump_program(&mut output, &c.program);
         da_append(&mut output, 0);
-        printf(c!("%s"), output.items);
+        print!("{}", r!(output.items));
         return Some(())
     }
 
@@ -1405,42 +1405,42 @@ pub unsafe fn main(mut argc: i32, mut argv: *mut*mut c_char) -> Option<()> {
             }
         }
         Target::Uxn => {
-            codegen::uxn::generate_program(
-                // Inputs
-                &c.program, program_path, garbage_base, da_slice(*linker), *debug,
-                // Temporaries
-                &mut output, &mut cmd,
-            )?;
+            // codegen::uxn::generate_program(
+            //     // Inputs
+            //     &c.program, program_path, garbage_base, da_slice(*linker), *debug,
+            //     // Temporaries
+            //     &mut output, &mut cmd,
+            // )?;
 
-            if *run {
-                codegen::uxn::run_program(&mut cmd, c!("uxnemu"), program_path, da_slice(run_args), None)?;
-            }
+            // if *run {
+            //     codegen::uxn::run_program(&mut cmd, c!("uxnemu"), program_path, da_slice(run_args), None)?;
+            // }
         }
         Target::Mos6502 => {
-            let config = codegen::mos6502::parse_config_from_link_flags(da_slice(*linker))?;
+            // let config = codegen::mos6502::parse_config_from_link_flags(da_slice(*linker))?;
 
-            codegen::mos6502::generate_program(
-                // Inputs
-                &c.program, program_path, garbage_base, config, *debug,
-                // Temporaries
-                &mut output, &mut cmd,
-            )?;
+            // codegen::mos6502::generate_program(
+            //     // Inputs
+            //     &c.program, program_path, garbage_base, config, *debug,
+            //     // Temporaries
+            //     &mut output, &mut cmd,
+            // )?;
 
-            if *run {
-                codegen::mos6502::run_program(&mut output, config, program_path, None)?;
-            }
+            // if *run {
+            //     codegen::mos6502::run_program(&mut output, config, program_path, None)?;
+            // }
         }
         Target::ILasm_Mono => {
-            codegen::ilasm_mono::generate_program(
-                // Inputs
-                &c.program, program_path, garbage_base, da_slice(*linker), *debug,
-                // Temporaries
-                &mut output, &mut cmd,
-            )?;
+            // codegen::ilasm_mono::generate_program(
+            //     // Inputs
+            //     &c.program, program_path, garbage_base, da_slice(*linker), *debug,
+            //     // Temporaries
+            //     &mut output, &mut cmd,
+            // )?;
 
-            if *run {
-                codegen::ilasm_mono::run_program(&mut cmd, program_path, da_slice(run_args), None)?;
-            }
+            // if *run {
+            //     codegen::ilasm_mono::run_program(&mut cmd, program_path, da_slice(run_args), None)?;
+            // }
         }
     }
     Some(())

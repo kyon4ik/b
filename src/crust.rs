@@ -2,12 +2,147 @@
 use crate::crust::libc::*;
 use core::panic::PanicInfo;
 use core::ffi::*;
+use core::fmt;
 
 #[macro_export]
 macro_rules! c {
     ($l:expr) => {
         concat!($l, "\0").as_ptr() as *const c_char
     }
+}
+
+#[macro_export]
+macro_rules! r {
+    ($l:expr) => {{
+        let s = CStr::from_ptr($l as *const c_char);
+        str::from_utf8(s.to_bytes()).unwrap()
+    }}
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct IoError;
+
+pub trait IoWrite {
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), IoError>;
+    fn flush(&mut self) -> Result<(), IoError>;
+
+    fn write_fmt(&mut self, args: fmt::Arguments<'_>) -> Result<(), IoError> {
+        if let Some(s) = args.as_str() {
+            self.write_all(s.as_bytes())
+        } else {
+            default_write_fmt(self, args)
+        }
+    }
+}
+
+pub(crate) fn default_write_fmt<W: IoWrite + ?Sized>(
+    this: &mut W,
+    args: fmt::Arguments<'_>,
+) -> Result<(), IoError> {
+    // Create a shim which translates a `Write` to a `fmt::Write` and saves off
+    // I/O errors, instead of discarding them.
+    struct Adapter<'a, T: ?Sized + 'a> {
+        inner: &'a mut T,
+        error: Result<(), IoError>,
+    }
+
+    impl<T: IoWrite + ?Sized> fmt::Write for Adapter<'_, T> {
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            match self.inner.write_all(s.as_bytes()) {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    self.error = Err(e);
+                    Err(fmt::Error)
+                }
+            }
+        }
+    }
+
+    let mut output = Adapter {
+        inner: this,
+        error: Ok(()),
+    };
+
+    match fmt::write(&mut output, args) {
+        Ok(()) => Ok(()),
+        Err(..) => {
+            // Check whether the error came from the underlying `Write`.
+            if output.error.is_err() {
+                output.error
+            } else {
+                // This shouldn't happen: the underlying stream did not error,
+                // but somehow the formatter still errored?
+                panic!(
+                    "a formatting trait implementation returned an error when the underlying stream did not"
+                );
+            }
+        }
+    }
+}
+
+impl IoWrite for libc::FILE {
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), IoError> {
+        unsafe {
+            for ch in buf {
+                if libc::fputc(*ch as c_int, self as *mut FILE) < 0 {
+                    return Err(IoError);
+                }
+            }
+            Ok(())
+        }
+    }
+
+    fn flush(&mut self) -> Result<(), IoError> {
+        unsafe {
+            if libc::fflush(self as *mut FILE) < 0 {
+                Err(IoError)
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => {{
+        use $crate::crust::IoWrite;
+        let stdout = $crate::crust::libc::stdout();
+        write!(&mut (*stdout), "{}\0", format_args!($($arg)*)).unwrap();
+    }};
+}
+
+#[macro_export]
+macro_rules! println {
+    () => {{
+        print!("\n")
+    }};
+    ($($arg:tt)*) => {{
+        use $crate::crust::IoWrite;
+        let stdout = $crate::crust::libc::stdout();
+        write!(&mut (*stdout), "{}\n\0", format_args!($($arg)*)).unwrap();
+    }};
+}
+
+#[macro_export]
+macro_rules! eprint {
+    ($($arg:tt)*) => {{
+        use $crate::crust::IoWrite;
+        let stderr = $crate::crust::libc::stderr();
+        write!(&mut (*stderr), "{}\0", format_args!($($arg)*)).unwrap();
+    }};
+}
+
+#[macro_export]
+macro_rules! eprintln {
+    () => {{
+        eprint!("\n")
+    }};
+    ($($arg:tt)*) => {{
+        use $crate::crust::IoWrite;
+        let stderr = $crate::crust::libc::stderr();
+        writeln!(&mut (*stderr), "{}\n\0", format_args!($($arg)*)).unwrap();
+    }};
 }
 
 #[macro_export]
@@ -82,7 +217,8 @@ where Key: PartialEq
 pub mod libc {
     use core::ffi::*;
 
-    pub type FILE = c_void;
+    #[repr(transparent)]
+    pub struct FILE(c_void);
 
     extern "C" {
         #[link_name = "get_stdin"]
@@ -103,8 +239,11 @@ pub mod libc {
         pub fn abort() -> !;
         pub fn strdup(s: *const c_char) -> *mut c_char;
         pub fn strncpy(dst: *mut c_char, src: *const c_char, dsize: usize) -> *mut c_char;
-        pub fn printf(fmt: *const c_char, ...) -> c_int;
-        pub fn fprintf(stream: *mut FILE, fmt: *const c_char, ...) -> c_int;
+        // pub fn printf(fmt: *const c_char, ...) -> c_int;
+        // pub fn fprintf(stream: *mut FILE, fmt: *const c_char, ...) -> c_int;
+        // pub fn fputs(s: *const c_char, stream: *mut FILE) -> c_int;
+        pub fn fputc(ch: c_int, stream: *mut FILE) -> c_int; 
+        pub fn fflush(stream: *mut FILE) -> c_int;
         pub fn memset(dest: *mut c_void, byte: c_int, size: usize) -> c_int;
         pub fn isspace(c: c_int) -> c_int;
         pub fn isalpha(c: c_int) -> c_int;
@@ -139,13 +278,13 @@ pub unsafe fn panic_handler(info: &PanicInfo) -> ! {
     // TODO: What's the best way to implement the panic handler within the Crust spirit
     //   PanicInfo must be passed by reference.
     if let Some(location) = info.location() {
-        fprintf(stderr(), c!("%.*s:%d: "), location.file().len(), location.file().as_ptr(), location.line());
+        eprint!("{}: ", location);
     }
-    fprintf(stderr(), c!("panicked"));
+    eprint!("panicked");
     if let Some(message) = info.message().as_str() {
-        fprintf(stderr(), c!(": %.*s"), message.len(), message.as_ptr());
+        eprint!(": {}", message);
     }
-    fprintf(stderr(), c!("\n"));
+    eprintln!();
     abort()
 }
 

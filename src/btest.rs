@@ -24,7 +24,7 @@ use core::ptr;
 use crust::libc::*;
 use nob::*;
 use targets::*;
-use codegen::mos6502::{Config, DEFAULT_LOAD_OFFSET};
+// use codegen::mos6502::{Config, DEFAULT_LOAD_OFFSET};
 use flag::*;
 use glob::*;
 use jim::*;
@@ -162,17 +162,18 @@ pub unsafe fn execute_test(
         Target::Gas_x86_64_Linux    => codegen::gas_x86_64::run_program(cmd, program_path, &[], Some(stdout_path), Os::Linux),
         Target::Gas_x86_64_Windows  => codegen::gas_x86_64::run_program(cmd, program_path, &[], Some(stdout_path), Os::Windows),
         Target::Gas_x86_64_Darwin   => codegen::gas_x86_64::run_program(cmd, program_path, &[], Some(stdout_path), Os::Darwin),
-        Target::Uxn                 => codegen::uxn::run_program(cmd, c!("uxncli"), program_path, &[], Some(stdout_path)),
-        Target::Mos6502             => codegen::mos6502::run_program(sb, Config {
-            load_offset: DEFAULT_LOAD_OFFSET
-        }, program_path, Some(stdout_path)),
-        Target::ILasm_Mono          => codegen::ilasm_mono::run_program(cmd, program_path, &[], Some(stdout_path)),
+        // Target::Uxn                 => codegen::uxn::run_program(cmd, c!("uxncli"), program_path, &[], Some(stdout_path)),
+        // Target::Mos6502             => codegen::mos6502::run_program(sb, Config {
+        //     load_offset: DEFAULT_LOAD_OFFSET
+        // }, program_path, Some(stdout_path)),
+        // Target::ILasm_Mono          => codegen::ilasm_mono::run_program(cmd, program_path, &[], Some(stdout_path)),
+        _ => unreachable!()
     };
 
     (*sb).count = 0;
     read_entire_file(stdout_path, sb)?; // Should always succeed, but may fail if stdout_path is a directory for instance.
     da_append(sb, 0);                   // NULL-terminating the stdout
-    printf(c!("%s"), (*sb).items);      // Forward stdout for diagnostic purposes
+    print!("{}", r!((*sb).items));      // Forward stdout for diagnostic purposes
 
     if run_result.is_none() {
         Some(Outcome::RunFail)
@@ -182,9 +183,9 @@ pub unsafe fn execute_test(
 }
 
 pub unsafe fn usage() {
-    fprintf(stderr(), c!("B Compiler Testing Tool\n"));
-    fprintf(stderr(), c!("Usage: %s [OPTIONS]\n"), flag_program_name());
-    fprintf(stderr(), c!("OPTIONS:\n"));
+    eprint!("B Compiler Testing Tool\n");
+    eprint!("Usage: {} [OPTIONS]\n", r!(flag_program_name()));
+    eprint!("OPTIONS:\n");
     flag_print_options(stderr());
 }
 
@@ -207,16 +208,16 @@ const BLUE:   *const c_char = c!("\x1b[94m");
 pub unsafe fn print_legend(row_width: usize) {
     for i in 0..REPORT_STATUS_ORDER.len() {
         let status = (*REPORT_STATUS_ORDER)[i];
-        printf(c!("%*s%s%s%s - %s\n"), row_width + 2, c!(""), status.color(), status.letter(), RESET, status.description());
+        println!("{1:0$}{2}{3}{4} - {5}", row_width + 2, "", r!(status.color()), r!(status.letter()), r!(RESET), r!(status.description()));
     }
 }
 
 pub unsafe fn print_report_stats(stats: ReportStats) {
     for i in 0..REPORT_STATUS_ORDER.len() {
         let status = (*REPORT_STATUS_ORDER)[i];
-        printf(c!(" %s%s%s: %-3zu"), status.color(), status.letter(), RESET, stats.entries[i]);
+        print!(" {}{}{}: {:<3}", r!(status.color()), r!(status.letter()), r!(RESET), stats.entries[i]);
     }
-    printf(c!("\n"));
+    println!();
 }
 
 pub unsafe fn print_top_labels(targets: *const [Target], stats_by_target: *const [ReportStats], row_width: usize, col_width: usize) {
@@ -224,12 +225,12 @@ pub unsafe fn print_top_labels(targets: *const [Target], stats_by_target: *const
     for j in 0..targets.len() {
         let target = (*targets)[j];
         let stats = (*stats_by_target)[j];
-        printf(c!("%*s"), row_width + 2, c!(""));
+        print!("{1:0$}", row_width + 2, "");
         for _ in 0..j {
-            printf(c!("│ "));
+            print!("│ ");
         }
         // TODO: these fancy unicode characters don't work well on mingw32 build via wine
-        printf(c!("┌─%-*s"), col_width - 2*j, target.name());
+        print!("┌─{1:<0$}", col_width - 2*j, r!(target.name()));
         print_report_stats(stats)
     }
 }
@@ -239,11 +240,11 @@ pub unsafe fn print_bottom_labels(targets: *const [Target], stats_by_target: *co
     for j in (0..targets.len()).rev() {
         let target = (*targets)[j];
         let stats = (*stats_by_target)[j];
-        printf(c!("%*s"), row_width + 2, c!(""));
+        print!("{1:0$}", row_width + 2, "");
         for _ in 0..j {
-            printf(c!("│ "));
+            print!("│ ");
         }
-        printf(c!("└─%-*s"), col_width - 2*j, target.name());
+        print!("└─{1:<0$}", col_width - 2*j, r!(target.name()));
         print_report_stats(stats)
     }
 }
@@ -261,7 +262,7 @@ pub unsafe fn matches_glob(pattern: *const c_char, text: *const c_char) -> Optio
     match result {
         Ok(result) => Some(result),
         Err(error) => {
-            fprintf(stderr(), c!("ERROR: while matching pattern `%s`: %s\n"), pattern, error);
+            eprintln!("ERROR: while matching pattern `{}`: {}", r!(pattern), r!(error));
             None
         }
     }
@@ -382,19 +383,19 @@ pub unsafe fn generate_report(reports: *const [Report], stats_by_target: *const 
     }
 
     print_legend(row_width);
-    printf(c!("\n"));
+    println!();
     print_top_labels(targets, stats_by_target, row_width, col_width);
     for i in 0..reports.len() {
         let report = (*reports)[i];
-        printf(c!("%*s:"), row_width, report.name);
+        print!("{1:0$}:", row_width, r!(report.name));
         for j in 0..report.statuses.count {
             let status = *report.statuses.items.add(j);
-            printf(c!(" %s%s%s"), status.color(), status.letter(), RESET);
+            print!(" {}{}{}", r!(status.color()), r!(status.letter()), r!(RESET));
         }
-        printf(c!("\n"));
+        println!();
     }
     print_bottom_labels(targets, stats_by_target, row_width, col_width);
-    printf(c!("\n"));
+    println!();
     print_legend(row_width);
 }
 
@@ -430,7 +431,7 @@ pub unsafe fn load_tt_from_json_file_if_exists(
 ) -> Option<TestTable> {
     let mut tt: TestTable = zeroed();
     if file_exists(json_path)? {
-        printf(c!("INFO: loading file %s...\n"), json_path);
+        println!("INFO: loading file {}...", r!(json_path));
         // TODO: file may stop existing between file_exists() and read_entire_file() cools
         // It would be much better if read_entire_file() returned the reason of failure so
         // it's easy to check if it failed due to ENOENT, but that requires significant
@@ -541,7 +542,7 @@ pub unsafe fn load_tt_from_json_file_if_exists(
         }
         jimp_array_end(jimp)?;
     } else {
-        printf(c!("INFO: %s doesn't exist. Nothing to load.\n"), json_path);
+        println!("INFO: {} doesn't exist. Nothing to load.", r!(json_path));
     }
     Some(tt)
 }
@@ -550,7 +551,7 @@ pub unsafe fn save_tt_to_json_file(
     json_path: *const c_char, tt: TestTable,
     jim: *mut Jim,
 ) -> Option<()> {
-    printf(c!("INFO: saving file %s...\n"), json_path);
+    println!("INFO: saving file {}...", r!(json_path));
     jim_begin(jim);
     jim_array_begin(jim);
     for i in 0..tt.count {
@@ -608,13 +609,13 @@ pub unsafe fn replay_tests(
                         match outcome {
                             Outcome::RunSuccess{stdout} =>
                                 if strcmp((*row).expected_stdout, stdout) != 0 {
-                                    fprintf(stderr(), c!("UNEXPECTED OUTCOME!!!\n"));
+                                    eprintln!("UNEXPECTED OUTCOME!!!");
                                     jim_begin(jim);
                                     jim_string(jim, (*row).expected_stdout);
-                                    fprintf(stderr(), c!("EXPECTED: %.*s\n"), (*jim).sink_count, (*jim).sink);
+                                    eprintln!("EXPECTED: {1:0$}", (*jim).sink_count, r!((*jim).sink));
                                     jim_begin(jim);
                                     jim_string(jim, stdout);
-                                    fprintf(stderr(), c!("ACTUAL:   %.*s\n"), (*jim).sink_count, (*jim).sink);
+                                    eprintln!("ACTUAL:   {1:0$}", (*jim).sink_count, r!((*jim).sink));
                                     da_append(&mut report.statuses, ReportStatus::StdoutMismatch);
                                 } else {
                                     da_append(&mut report.statuses, ReportStatus::OK);
@@ -635,7 +636,7 @@ pub unsafe fn replay_tests(
 
                 match outcome {
                     Outcome::RunSuccess{..} => {
-                        fprintf(stderr(), c!("UNEXPECTED OUTCOME!!! The outcome was never recorded. Please use -record flag to record what is expected for this test case at this target\n"));
+                        eprintln!("UNEXPECTED OUTCOME!!! The outcome was never recorded. Please use -record flag to record what is expected for this test case at this target");
                         da_append(&mut report.statuses, ReportStatus::NeverRecorded);
                     }
                     Outcome::BuildFail => da_append(&mut report.statuses, ReportStatus::BuildFail),
@@ -716,14 +717,14 @@ pub unsafe fn main(argc: i32, argv: *mut*mut c_char) -> Option<()> {
     }
 
     let Some(action) = Action::from_name(*action_flag) else {
-        fprintf(stderr(), c!("ERROR: unknown action `%s`\n"), *action_flag);
+        eprintln!("ERROR: unknown action `{}`", r!(*action_flag));
         return None;
     };
 
     let json_path = c!("tests.json");
 
     if *list_actions {
-        fprintf(stderr(), c!("Available actions:\n"));
+        eprintln!("Available actions:");
         let mut width = 0;
         for i in 0..ACTION_ORDER.len() {
             width = cmp::max(width, strlen((*ACTION_ORDER)[i].name()));
@@ -732,22 +733,22 @@ pub unsafe fn main(argc: i32, argv: *mut*mut c_char) -> Option<()> {
             let action = (*ACTION_ORDER)[i];
             match action {
                 Action::Replay => {
-                    printf(c!("  %-*s - Replay the selected Test Matrix slice with expected outputs from %s.\n"), width, action.name(), json_path);
+                    println!("  {1:<0$} - Replay the selected Test Matrix slice with expected outputs from {2}.", width, r!(action.name()), r!(json_path));
                 }
                 Action::Record => {
-                    printf(c!("  %-*s - Record the selected Test Matrix slice into %s.\n"), width, action.name(), json_path);
+                    println!("  {1:<0$} - Record the selected Test Matrix slice into {2}.", width, r!(action.name()), r!(json_path));
                 }
                 Action::Prune  => {
-                    printf(c!("  %-*s - Prune all the recordings from %s that are outside of the selected Test Matrix slice.\n"), width, action.name(), json_path);
-                    printf(c!("  %-*s   Useful when you delete targets or test cases. Just delete a target or a test case and\n"), width, c!(""));
-                    printf(c!("  %-*s   run `%s -%s %s` without any additional flags.\n"), width, c!(""), flag_program_name(), flag_name(action_flag), Action::Prune.name());
+                    println!("  {1:<0$} - Prune all the recordings from {2} that are outside of the selected Test Matrix slice.", width, r!(action.name()), r!(json_path));
+                    println!("  {1:<0$}   Useful when you delete targets or test cases. Just delete a target or a test case and", width, "");
+                    println!("  {1:<0$}   run `{2} -{3} {4}` without any additional flags.", width, "", r!(flag_program_name()), r!(flag_name(action_flag)), r!(Action::Prune.name()));
                 }
                 Action::Disable => {
-                    printf(c!("  %-*s - Disable all the tests in the selected Test Matrix slice.\n"), width, action.name());
-                    printf(c!("  %-*s   You can optionally set the comment with the -%s flag.\n"), width, c!(""), flag_name(comment));
+                    println!("  {1:<0$} - Disable all the tests in the selected Test Matrix slice.", width, r!(action.name()));
+                    println!("  {1:<0$}   You can optionally set the comment with the -{2} flag.", width, "", r!(flag_name(comment)));
                 }
                 Action::Count => {
-                    printf(c!("  %-*s - Count the amount of rows in %s.\n"), width, action.name(), json_path);
+                    println!("  {1:<0$} - Count the amount of rows in {2}.", width, r!(action.name()), r!(json_path));
                 }
             };
         }
@@ -778,7 +779,7 @@ pub unsafe fn main(argc: i32, argv: *mut*mut c_char) -> Option<()> {
                 }
             }
             if !added_anything {
-                fprintf(stderr(), c!("ERROR: unknown target `%s`\n"), pattern);
+                eprintln!("ERROR: unknown target `{}`", r!(pattern));
                 return None;
             }
         }
@@ -826,7 +827,7 @@ pub unsafe fn main(argc: i32, argv: *mut*mut c_char) -> Option<()> {
                 }
             }
             if selected_cases.count == saved_count {
-                fprintf(stderr(), c!("ERROR: unknown test case `%s`\n"), pattern);
+                eprintln!("ERROR: unknown test case `{}`", r!(pattern));
                 return None;
             }
         }
@@ -850,19 +851,19 @@ pub unsafe fn main(argc: i32, argv: *mut*mut c_char) -> Option<()> {
     // TODO: maybe merge -tlist and -clist outputs if they are provided together
 
     if *list_targets {
-        fprintf(stderr(), c!("Compilation targets:\n"));
+        eprintln!("Compilation targets:");
         for i in 0..targets.count {
             let target = *targets.items.add(i);
-            fprintf(stderr(), c!("    %s\n"), target.name());
+            eprintln!("    {}", r!(target.name()));
         }
         return Some(());
     }
 
     if *list_cases {
-        fprintf(stderr(), c!("Test cases:\n"));
+        eprintln!("Test cases:");
         for i in 0..cases.count {
             let case = *cases.items.add(i);
-            fprintf(stderr(), c!("    %s\n"), case);
+            eprintln!("    {}", r!(case));
         }
         return Some(());
     }
@@ -870,7 +871,7 @@ pub unsafe fn main(argc: i32, argv: *mut*mut c_char) -> Option<()> {
     if !mkdir_if_not_exists(GARBAGE_FOLDER) { return None; }
 
     if *record {
-        fprintf(stderr(), c!("ERROR: Flag `-%s` is DEPRECATED! Please use `-%s %s` instead.\n"), flag_name(record), flag_name(action_flag), Action::Record.name());
+        eprintln!("ERROR: Flag `-{}` is DEPRECATED! Please use `-{} {}` instead.", r!(flag_name(record)), r!(flag_name(action_flag)), r!(Action::Record.name()));
         return None
     }
 
@@ -916,7 +917,7 @@ pub unsafe fn main(argc: i32, argv: *mut*mut c_char) -> Option<()> {
                 let case_name = *cases.items.add(i);
                 for j in 0..targets.count {
                     let target = *targets.items.add(j);
-                    printf(c!("INFO: disabling %-*s for %-*s\n"), case_width, case_name, target_width, target.name());
+                    println!("INFO: disabling {1:<0$} for {3:<2$}", case_width, r!(case_name), target_width, r!(target.name()));
                     if let Some(row) = test_table_find_row(&mut tt, case_name, target) {
                         (*row).state = TestState::Disabled;
                         if !(*comment).is_null() {
@@ -941,7 +942,7 @@ pub unsafe fn main(argc: i32, argv: *mut*mut c_char) -> Option<()> {
         }
         Action::Count => {
             let tt = load_tt_from_json_file_if_exists(json_path, *test_folder, &mut sb, &mut jimp)?;
-            printf(c!("%zu\n"), tt.count);
+            println!("{}", tt.count);
         }
     }
 

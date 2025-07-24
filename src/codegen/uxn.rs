@@ -676,7 +676,7 @@ pub unsafe fn load_arg(arg: Arg, loc: Loc, output: *mut String_Builder, assemble
         }
         Arg::Literal(value) => {
             if value >= 65536 {
-                diagf!(loc, c!("WARNING: constant `%llu` out of range for 16 bits\n"), value);
+                diagf!(loc, "WARNING: constant `{}` out of range for 16 bits\n", value);
             }
             write_lit2(output, value as u16);
         }

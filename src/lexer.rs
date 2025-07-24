@@ -2,6 +2,7 @@ use core::ffi::*;
 use core::mem::zeroed;
 use crate::nob::*;
 use crate::crust::libc::*;
+use crate::crust::*;
 
 #[derive(Clone, Copy)]
 pub struct Loc {
@@ -13,18 +14,17 @@ pub struct Loc {
 #[macro_export]
 macro_rules! diagf {
     ($loc:expr, $($args:tt)*) => {{
-        fprintf(stderr(), c!("%s:%d:%d: "), $loc.input_path, $loc.line_number, $loc.line_offset);
-        fprintf(stderr(), $($args)*);
+        eprint!("{:?}:{}:{}: ", $loc.input_path, $loc.line_number, $loc.line_offset);
+        eprint!($($args)*);
     }};
 }
 
 #[macro_export]
 macro_rules! missingf {
     ($loc:expr, $($args:tt)*) => {{
-        let file = file!();
-        fprintf(stderr(), c!("%s:%d:%d: TODO: "), $loc.input_path, $loc.line_number, $loc.line_offset);
-        fprintf(stderr(), $($args)*);
-        fprintf(stderr(), c!("%.*s:%d: INFO: implementation should go here\n"), file.len(), file.as_ptr(), line!());
+        eprint!("{:?}:{}:{}: TODO: ", $loc.input_path, $loc.line_number, $loc.line_offset);
+        eprint!($($args)*);
+        eprintln!("{}:{}: INFO: implementation should go here", file!(), line!());
         abort();
     }}
 }
@@ -381,7 +381,7 @@ pub unsafe fn parse_string_into_storage(l: *mut Lexer, delim: c_char) -> Option<
                 skip_char(l);
                 let Some(x) = peek_char(l) else {
                     (*l).token = Token::ParseError;
-                    diagf!(loc(l), c!("LEXER ERROR: Unfinished escape sequence\n"));
+                    diagf!(loc(l), "LEXER ERROR: Unfinished escape sequence\n");
                     return None;
                 };
                 let x = match x {
@@ -393,7 +393,7 @@ pub unsafe fn parse_string_into_storage(l: *mut Lexer, delim: c_char) -> Option<
                     x if x == escape_char     => escape_char,
                     x => {
                         (*l).token = Token::ParseError;
-                        diagf!(loc(l), c!("LEXER ERROR: Unknown escape sequence starting with `%c`\n"), x as c_int);
+                        diagf!(loc(l), "LEXER ERROR: Unknown escape sequence starting with `{}`\n", x);
                         return None;
                     }
                 };
@@ -447,14 +447,14 @@ unsafe fn parse_number(l: *mut Lexer, radix: Radix, report_point: Parse_Point) -
 
         let Some(r) = (*l).int_number.checked_mul(radix as u64) else {
             (*l).parse_point = report_point;
-            diagf!(loc(l), c!("LEXER ERROR: Constant integer overflow\n"));
+            diagf!(loc(l), "LEXER ERROR: Constant integer overflow\n");
             return None;
         };
         (*l).int_number = r;
 
         let Some(r) = (*l).int_number.checked_add(d as u64) else {
             (*l).parse_point = report_point;
-            diagf!(loc(l), c!("LEXER ERROR: Constant integer overflow.\n"));
+            diagf!(loc(l), "LEXER ERROR: Constant integer overflow.\n");
             return None;
         };
         (*l).int_number = r;
@@ -472,7 +472,7 @@ pub unsafe fn get_token(l: *mut Lexer) -> Option<()> {
         if skip_prefix(l, c!("//")) {
             if (*l).historical {
                 (*l).parse_point = saved_point;
-                diagf!(loc(l), c!("LEXER ERROR: C++ style comments are not available in the historical mode.\n"));
+                diagf!(loc(l), "LEXER ERROR: C++ style comments are not available in the historical mode.\n");
                 (*l).token = Token::ParseError;
                 return None;
             }
@@ -533,7 +533,7 @@ pub unsafe fn get_token(l: *mut Lexer) -> Option<()> {
     if skip_prefix(l, c!("0x")) {
         if (*l).historical {
             (*l).parse_point = start_of_number;
-            diagf!(loc(l), c!("LEXER ERROR: hex literals are not available in the historical mode.\n"));
+            diagf!(loc(l), "LEXER ERROR: hex literals are not available in the historical mode.\n");
             (*l).token = Token::ParseError;
             return None;
         }
@@ -561,8 +561,8 @@ pub unsafe fn get_token(l: *mut Lexer) -> Option<()> {
         (*l).string_storage.count = 0;
         parse_string_into_storage(l, '"' as c_char)?;
         if is_eof(l) {
-            diagf!(loc(l), c!("LEXER ERROR: Unfinished string literal\n"));
-            diagf!((*l).loc, c!("LEXER INFO: Literal starts here\n"));
+            diagf!(loc(l), "LEXER ERROR: Unfinished string literal\n");
+            diagf!((*l).loc, "LEXER INFO: Literal starts here\n");
             (*l).token = Token::ParseError;
             return None;
         }
@@ -578,21 +578,21 @@ pub unsafe fn get_token(l: *mut Lexer) -> Option<()> {
         (*l).string_storage.count = 0;
         parse_string_into_storage(l, '\'' as c_char)?;
         if is_eof(l) {
-            diagf!(loc(l), c!("LEXER ERROR: Unfinished character literal\n"));
-            diagf!((*l).loc, c!("LEXER INFO: Literal starts here\n"));
+            diagf!(loc(l), "LEXER ERROR: Unfinished character literal\n");
+            diagf!((*l).loc, "LEXER INFO: Literal starts here\n");
             (*l).token = Token::ParseError;
             return None;
         }
         skip_char(l);
         if (*l).string_storage.count == 0 {
-            diagf!((*l).loc, c!("LEXER ERROR: Empty character literal\n"));
+            diagf!((*l).loc, "LEXER ERROR: Empty character literal\n");
             (*l).token = Token::ParseError;
             return None;
         }
         if (*l).string_storage.count > 2 {
             // TODO: maybe we should allow more on targets with 64 bits?
             // TODO: such error should not terminate the compilation
-            diagf!((*l).loc, c!("LEXER ERROR: Character literal contains more than two characters\n"));
+            diagf!((*l).loc, "LEXER ERROR: Character literal contains more than two characters\n");
             (*l).token = Token::ParseError;
             return None;
         }
@@ -604,7 +604,7 @@ pub unsafe fn get_token(l: *mut Lexer) -> Option<()> {
         return Some(());
     }
 
-    diagf!((*l).loc, c!("LEXER ERROR: Unknown token %c\n"), *(*l).parse_point.current as c_int);
+    diagf!((*l).loc, "LEXER ERROR: Unknown token {}\n", *(*l).parse_point.current);
     (*l).token = Token::ParseError;
     None
 }
